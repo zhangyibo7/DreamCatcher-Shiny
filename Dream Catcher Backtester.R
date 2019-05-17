@@ -75,6 +75,24 @@ names(data) = c("Inst1Px","Inst2Px")
 #   b = r$loadings[1,1] / r$loadings[2,1]  
 # }
 
+#**************************************************************************************************************
+# Calculate Beta
+# slice raw data into selected range
+insample_testDate = paste0(Sys.Date()-(inSampleWindow + outSampleWindow), "/", Sys.Date()-inSampleWindow)##
+tryCatch({
+  pca = prcomp(cbind(data$Inst1Px[insample_testDate], data$Inst2Px[insample_testDate]))$rotation
+  beta = pca[1,1]/pca[2,1]
+  },error = function(e) {
+    print("invalid data, failed to calculate Beta, assuming beta=1")
+    beta = 1
+  },warning = function(w) {
+    print("invalid data, failed to calculate Beta, assuming beta=1")
+    beta = 1
+  }) # end of tryCatch
+#**************************************************************************************************************
+
+
+
 data$Beta = symbols[x,"Beta"]
 data$SprdPx = data[,"Inst1Px"] + data[,"Inst2Px"] * data[,"Beta"]
 
@@ -291,3 +309,67 @@ ledgerPortfolio = merge(ledgerPortfolio, ledgerDaily[,"PnlNet"])
 
 ledgerPortfolio$Total = rowSums(ledgerPortfolio, na.rm=T)
 ledgerPortfolio$Rolling = cumsum(ledgerPortfolio$Total)
+
+
+
+
+
+ui <- fluidPage(
+  
+  # App title ----
+  titlePanel("Dream Catcher Backtester"),
+  
+  # Sidebar layout with input and output definitions ----
+  sidebarLayout(
+    
+    # Sidebar panel for inputs ----
+    sidebarPanel(
+      
+      # File input, ticker list
+      fileInput("ticker_file", "Tickers to be tested, in .csv",
+                accept = c('text/csv','text/comma-separated-values,text/plain', '.csv')),
+      
+      # Input:  ----
+      # In-sample-month for beta calculation
+      numericInput(inputId="insampleMonth", 
+                   label="Please specify in-sample length in months (Default: 60)", 
+                   value=60),
+      # out-of-sample month for testing
+      numericInput(inputId="outsampleMonth", 
+                   label="Please specify out-of-sample length in months (Default: 12)", 
+                   value=12),
+      # Moving Average window length
+      numericInput(inputId="MA_length", 
+                   label="Please specify simple MA length (Default: 200)", 
+                   value=200),
+      # bolinger band standard deviations
+      numericInput(inputId="bband_dist", 
+                   label="Please specify Bollinger Band Distance (Default: 4)", 
+                   value=4),
+      # average daily trading volume for screening
+      numericInput(inputId="avgDailyVolume6", 
+                   label="Please specify Average daily volume in (Default: 200000)", 
+                   value=200000),
+      # maximum notional stock price for screening
+      numericInput(inputId="maxNotional", 
+                   label="Please specify Max Notional Value (Default: 100)", 
+                   value=100),
+      # action button to start the process
+      actionButton("update", "Start Screening")
+      
+      
+    ),
+    
+    
+    # Main panel for displaying outputs ----
+    mainPanel(
+      
+      # Output: Histogram ----
+      
+      verbatimTextOutput(outputId = "initial_screen"),
+      verbatimTextOutput(outputId = "good_pairs")
+      #tableOutput('corr')
+      
+    )
+  )
+)
